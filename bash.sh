@@ -226,11 +226,5 @@ pkg_install_aarch64() {
 pkg_install_arm64() {
     pkg update -y && pkg install -y build-essential wget tar patch binutils 
 }
-pkg_install_arm() {
-    pkg update -y && pkg install -y build-essential wget tar patch binutils 
-}
-pkg_install_x86_64() {
-    pkg update -y && pkg install -y build-essential wget tar patch binutils 
-}
 
 main
