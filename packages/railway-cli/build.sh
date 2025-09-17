@@ -1,9 +1,0 @@
-TERMUX_PKG_HOMEPAGE=https://railway.app
-TERMUX_PKG_DESCRIPTION="This is the command line interface for Railway"
-TERMUX_PKG_LICENSE="MIT"
-TERMUX_PKG_MAINTAINER="@termux"
-TERMUX_PKG_VERSION="4.8.0"
-TERMUX_PKG_SRCURL=https://github.com/railwayapp/cli/archive/refs/tags/v${TERMUX_PKG_VERSION}.tar.gz
-TERMUX_PKG_SHA256=e7c84f697e96a671bc05ea6d6a407595fabc684f0baa16a9f9192d2a7db4274d
-TERMUX_PKG_BUILD_IN_SRC=true
-TERMUX_PKG_AUTO_UPDATE=true
