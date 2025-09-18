@@ -6,12 +6,13 @@ TERMUX_HOME="/data/data/com.termux/files/home"
 TERMUX_PREFIX="${TERMUX_HOME}/system"
 TERMUX_BIN="${TERMUX_PREFIX}/bin"
 TERMUX_LIB="${TERMUX_PREFIX}/lib64"
-TERMUX_SHARE="${TERMUX_PREFIX}/usr/share"
+TERMUX_LIB32="${TERMUX_PREFIX}/lib"
+TERMUX_ETC="${TERMUX_PREFIX}/etc"
 TERMUX_INCLUDE="${TERMUX_PREFIX}/include"
 TERMUX_TMPDIR="${TERMUX_HOME}/tmp"
 TERMUX_CACHEDIR="${TERMUX_HOME}/cache"
 
-mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB/pkgconfig" "$TERMUX_SHARE" "$TERMUX_INCLUDE" "$TERMUX_SHARE/terminfo" "$TERMUX_PREFIX/etc"
+mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB" "$TERMUX_LIB32" "$TERMUX_LIB/pkgconfig" "$TERMUX_ETC" "$TERMUX_INCLUDE"
 
 termux_download() {
     local url="$1"
@@ -59,12 +60,13 @@ am_cv_langinfo_codeset=no
 --enable-pc-files
 --enable-termcap
 --enable-widec
---mandir=$TERMUX_SHARE/man
+--mandir=$TERMUX_ETC/man
 --includedir=$TERMUX_INCLUDE
 --with-pkg-config-libdir=$TERMUX_LIB/pkgconfig
 --with-static
 --with-shared
---with-termpath=$TERMUX_PREFIX/etc/termcap:$TERMUX_SHARE/misc/termcap
+--with-termpath=$TERMUX_ETC/termcap
+--with-terminfo-dirs=/system_ext/etc/terminfo
 --prefix=$TERMUX_PREFIX
 "
 
@@ -94,6 +96,7 @@ termux_build_ncurses() {
     echo "Building ncurses..."
     cd "$TERMUX_TMPDIR/ncurses-snapshots-$NCURSES_SNAPSHOT_COMMIT"
     export CPPFLAGS="-fPIC"
+    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $NCURSES_CONFIGURE_ARGS
     make -j$(nproc)
     make install
@@ -119,34 +122,18 @@ termux_build_ncurses() {
     mkdir ncurses ncursesw
     ln -sf ../{curses.h,eti.h,form.h,menu.h,ncurses_dll.h,ncurses.h,panel.h,termcap.h,term_entry.h,term.h,unctrl.h} ncurses
     ln -sf ../{curses.h,eti.h,form.h,menu.h,ncurses_dll.h,ncurses.h,panel.h,termcap.h,term_entry.h,term.h,unctrl.h} ncursesw
-
-    local TI="$TERMUX_SHARE/terminfo"
-    mkdir -p "$TI"/{a,d,e,f,g,n,k,l,p,r,s,t,v,x}
-    cp -r "$TERMUX_PREFIX"/share/terminfo/a/{alacritty{,+common,-direct},ansi} "$TI/a/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/d/{dtterm,dumb} "$TI/d/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/e/eterm-color "$TI/e/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/f/foot{,+base,-direct} "$TI/f/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/g/gnome{,-256color} "$TI/g/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/n/nsterm "$TI/n/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/k/kitty{,+common,-direct} "$TI/k/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/l/linux "$TI/l/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/p/putty{,-256color} "$TI/p/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/r/rxvt{,-256color} "$TI/r/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/s/{screen{,2,-256color},st{,-256color}} "$TI/s/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/t/tmux{,-256color} "$TI/t/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/v/vt{52,100,102} "$TI/v/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/x/xterm{,-color,-new,-16color,-256color,+256color} "$TI/x/" || true
 }
 
 termux_build_nano() {
     echo "Building nano..."
     cd "$TERMUX_TMPDIR/nano-$NANO_VERSION"
     export CFLAGS="-I$TERMUX_INCLUDE -L$TERMUX_LIB"
+    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $NANO_CONFIGURE_ARGS
     make -j$(nproc)
     make install
-    rm -f "$TERMUX_BIN/rnano" "$TERMUX_SHARE/man/man1/rnano.1"
-    echo "include \"$TERMUX_PREFIX/share/nano/*nanorc\"" > "$TERMUX_PREFIX/etc/nanorc"
+    rm -f "$TERMUX_BIN/rnano" "$TERMUX_ETC/man/man1/rnano.1"
+    echo "include \"/system_ext/etc/nano/*nanorc\"" > "$TERMUX_ETC/nanorc"
 }
 
 main() {
@@ -169,8 +156,9 @@ main() {
 
     echo "- Binaries: $TERMUX_BIN"
     echo "- Libraries: $TERMUX_LIB"
+    echo "- Libraries (32-bit): $TERMUX_LIB32"
+    echo "- Configs: $TERMUX_ETC"
     echo "- Headers: $TERMUX_INCLUDE"
-    echo "- Share: $TERMUX_SHARE"
 }
 
 pkg_install_aarch64() {
