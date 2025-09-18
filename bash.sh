@@ -12,7 +12,7 @@ TERMUX_INCLUDE="${TERMUX_PREFIX}/include"
 TERMUX_TMPDIR="${TERMUX_HOME}/tmp"
 TERMUX_CACHEDIR="${TERMUX_HOME}/cache"
 
-mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB" "$TERMUX_LIB32" "$TERMUX_LIB/pkgconfig" "$TERMUX_ETC" "$TERMUX_INCLUDE"
+mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB" "$TERMUX_LIB32" "$TERMUX_LIB/pkgconfig" "$TERMUX_ETC/bash" "$TERMUX_INCLUDE"
 
 termux_download() {
     local url="$1"
@@ -155,7 +155,7 @@ termux_build_readline() {
     make -j$(nproc) $READLINE_MAKE_ARGS
     make install DESTDIR="$TERMUX_PREFIX"
     cp readline.pc "$TERMUX_LIB/pkgconfig/"
-    echo -e "set editing-mode vi\nset keymap vi" > "$TERMUX_ETC/inputrc"
+    echo -e "set editing-mode vi\nset keymap vi" > "$TERMUX_ETC/bash/inputrc"
 }
 
 termux_build_bash() {
@@ -174,8 +174,9 @@ termux_build_bash() {
     make install DESTDIR="$TERMUX_PREFIX"
     echo -e "export PATH=/system_ext/bin:\$PATH" > "$TERMUX_ETC/profile"
     echo -e "export TERMINFO=/system_ext/etc/terminfo" >> "$TERMUX_ETC/profile"
-    echo -e "if [ -f /system_ext/etc/bash.bashrc ]; then\n    . /system_ext/etc/bash.bashrc\nfi" >> "$TERMUX_ETC/profile"
-    echo -e "[ -z \"\$PS1\" ] && return\nshopt -s histappend\nHISTCONTROL=ignoreboth\nHISTSIZE=1000\nHISTFILESIZE=2000\nshopt -s checkwinsize" > "$TERMUX_ETC/bash.bashrc"
+    echo -e "if [ -f /system_ext/etc/bash/bashrc ]; then\n    . /system_ext/etc/bash/bashrc\nfi" >> "$TERMUX_ETC/profile"
+    echo -e "[ -z \"\$PS1\" ] && return\nshopt -s histappend\nHISTCONTROL=ignoreboth\nHISTSIZE=1000\nHISTFILESIZE=2000\nshopt -s checkwinsize" > "$TERMUX_ETC/bash/bashrc"
+    echo -e "if [ -f ~/.bash_logout ]; then\n    . ~/.bash_logout\nfi" > "$TERMUX_ETC/bash/bash_logout"
 }
 
 main() {

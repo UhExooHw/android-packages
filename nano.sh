@@ -12,7 +12,7 @@ TERMUX_INCLUDE="${TERMUX_PREFIX}/include"
 TERMUX_TMPDIR="${TERMUX_HOME}/tmp"
 TERMUX_CACHEDIR="${TERMUX_HOME}/cache"
 
-mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB" "$TERMUX_LIB32" "$TERMUX_LIB/pkgconfig" "$TERMUX_ETC" "$TERMUX_INCLUDE"
+mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB" "$TERMUX_LIB32" "$TERMUX_LIB/pkgconfig" "$TERMUX_ETC/nano" "$TERMUX_INCLUDE"
 
 termux_download() {
     local url="$1"
@@ -130,8 +130,10 @@ termux_build_nano() {
     make -j$(nproc)
     make install DESTDIR="$TERMUX_PREFIX"
     rm -f "$TERMUX_BIN/rnano" "$TERMUX_ETC/man/man1/rnano.1"
-    echo "include \"/system_ext/etc/nano/*nanorc\"" > "$TERMUX_ETC/nanorc"
+    echo "include /system_ext/etc/nano/*.nanorc" > "$TERMUX_ETC/nanorc"
     echo "export TERMINFO=/system_ext/etc/terminfo" >> "$TERMUX_ETC/profile"
+    # Copy nanorc files from source
+    cp "$TERMUX_TMPDIR/nano-$NANO_VERSION/doc/syntax/"*.nanorc "$TERMUX_ETC/nano/"
 }
 
 main() {
