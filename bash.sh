@@ -43,7 +43,7 @@ termux_extract() {
 
 LIBICONV_VERSION="1.18"
 LIBICONV_SRCURL="https://mirrors.kernel.org/gnu/libiconv/libiconv-$LIBICONV_VERSION.tar.gz"
-LIBICONV_CONFIGURE_ARGS="--enable-extra-encodings --prefix=$TERMUX_PREFIX --includedir=$TERMUX_INCLUDE --libdir=$TERMUX_LIB"
+LIBICONV_CONFIGURE_ARGS="--enable-extra-encodings --prefix=/system_ext --includedir=/system_ext/include --libdir=/system_ext/lib64"
 
 NCURSES_SNAPSHOT_COMMIT="a480458efb0662531287f0c75116c0e91fe235cb"
 NCURSES_VERSION="6.5.20240831"
@@ -60,13 +60,13 @@ am_cv_langinfo_codeset=no
 --enable-pc-files
 --enable-termcap
 --enable-widec
---mandir=$TERMUX_ETC/man
---includedir=$TERMUX_INCLUDE
---with-pkg-config-libdir=$TERMUX_LIB/pkgconfig
+--mandir=/system_ext/man
+--includedir=/system_ext/include
+--with-pkg-config-libdir=/system_ext/lib64/pkgconfig
 --with-static
 --with-shared
---with-termpath=$TERMUX_ETC/termcap
---prefix=$TERMUX_PREFIX
+--with-termpath=/system_ext/etc/termcap
+--prefix=/system_ext
 "
 
 READLINE_MAIN_VERSION="8.3"
@@ -74,7 +74,7 @@ READLINE_PATCH_VERSION="1"
 READLINE_VERSION="$READLINE_MAIN_VERSION.$READLINE_PATCH_VERSION"
 READLINE_SRCURL="https://mirrors.kernel.org/gnu/readline/readline-$READLINE_MAIN_VERSION.tar.gz"
 READLINE_PATCH_URL="http://mirrors.kernel.org/gnu/readline/readline-$READLINE_MAIN_VERSION-patches/readline${READLINE_MAIN_VERSION/./}-001"
-READLINE_CONFIGURE_ARGS="--with-curses --enable-multibyte bash_cv_wcwidth_broken=no --prefix=$TERMUX_PREFIX --includedir=$TERMUX_INCLUDE --libdir=$TERMUX_LIB"
+READLINE_CONFIGURE_ARGS="--with-curses --enable-multibyte bash_cv_wcwidth_broken=no --prefix=/system_ext --includedir=/system_ext/include --libdir=/system_ext/lib64"
 READLINE_MAKE_ARGS="SHLIB_LIBS=-lncursesw"
 
 BASH_MAIN_VERSION="5.3"
@@ -98,9 +98,9 @@ bash_cv_unusable_rtsigs=no
 ac_cv_func_mbsnrtowcs=no
 bash_cv_dev_fd=whacky
 bash_cv_getcwd_malloc=yes
---prefix=$TERMUX_PREFIX
---includedir=$TERMUX_INCLUDE
---libdir=$TERMUX_LIB
+--prefix=/system_ext
+--includedir=/system_ext/include
+--libdir=/system_ext/lib64
 "
 
 termux_build_libiconv() {
@@ -108,7 +108,7 @@ termux_build_libiconv() {
     cd "$TERMUX_TMPDIR/libiconv-$LIBICONV_VERSION"
     ./configure $LIBICONV_CONFIGURE_ARGS
     make -j$(nproc)
-    make install
+    make install DESTDIR="$TERMUX_PREFIX"
 }
 
 termux_build_ncurses() {
@@ -117,7 +117,7 @@ termux_build_ncurses() {
     export CPPFLAGS="-fPIC"
     ./configure $NCURSES_CONFIGURE_ARGS
     make -j$(nproc)
-    make install
+    make install DESTDIR="$TERMUX_PREFIX"
 
     cd "$TERMUX_LIB" || { echo "Failed to access $TERMUX_LIB"; exit 1; }
     for lib in form menu ncurses panel; do
@@ -153,7 +153,7 @@ termux_build_readline() {
     export CFLAGS="-fexceptions -I$TERMUX_INCLUDE -L$TERMUX_LIB"
     ./configure $READLINE_CONFIGURE_ARGS
     make -j$(nproc) $READLINE_MAKE_ARGS
-    make install
+    make install DESTDIR="$TERMUX_PREFIX"
     cp readline.pc "$TERMUX_LIB/pkgconfig/"
     echo -e "set editing-mode vi\nset keymap vi" > "$TERMUX_ETC/inputrc"
 }
@@ -171,10 +171,10 @@ termux_build_bash() {
     export CFLAGS="-I$TERMUX_INCLUDE -L$TERMUX_LIB"
     ./configure $BASH_CONFIGURE_ARGS
     make -j$(nproc)
-    make install
+    make install DESTDIR="$TERMUX_PREFIX"
     echo -e "export PATH=/system_ext/bin:\$PATH" > "$TERMUX_ETC/profile"
     echo -e "export TERMINFO=/system_ext/etc/terminfo" >> "$TERMUX_ETC/profile"
-    echo -e "if [ -f $TERMUX_ETC/bash.bashrc ]; then\n    . $TERMUX_ETC/bash.bashrc\nfi" >> "$TERMUX_ETC/profile"
+    echo -e "if [ -f /system_ext/etc/bash.bashrc ]; then\n    . /system_ext/etc/bash.bashrc\nfi" >> "$TERMUX_ETC/profile"
     echo -e "[ -z \"\$PS1\" ] && return\nshopt -s histappend\nHISTCONTROL=ignoreboth\nHISTSIZE=1000\nHISTFILESIZE=2000\nshopt -s checkwinsize" > "$TERMUX_ETC/bash.bashrc"
 }
 
