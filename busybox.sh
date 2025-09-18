@@ -57,11 +57,15 @@ termux_build_busybox() {
         -e "s|@TERMUX_CFLAGS@|$CFLAGS|g" \
         -e "s|@TERMUX_LDFLAGS@|$LDFLAGS|g" \
         -e "s|@TERMUX_LDLIBS@|log|g" \
+        -e "s|@TERMUX_HOST_PLATFORM@-||g" \
+        -e "s|@TERMUX_SYSROOT@||g" \
         "busybox.config" > .config
     unset CFLAGS LDFLAGS
     make oldconfig
     make -j$(nproc)
     install -Dm700 "./busybox" "$TERMUX_PREFIX/bin/busybox"
+    install -Dm700 "./libbusybox.so.${BUSYBOX_VERSION}" "$TERMUX_PREFIX/lib/libbusybox.so.${BUSYBOX_VERSION}"
+    ln -sfr "$TERMUX_PREFIX/lib/libbusybox.so.${BUSYBOX_VERSION}" "$TERMUX_PREFIX/lib/libbusybox.so"
 }
 
 main() {
