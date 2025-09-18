@@ -66,7 +66,6 @@ am_cv_langinfo_codeset=no
 --with-static
 --with-shared
 --with-termpath=$TERMUX_ETC/termcap
---with-terminfo-dirs=/system_ext/etc/terminfo
 --prefix=$TERMUX_PREFIX
 "
 
@@ -96,7 +95,6 @@ termux_build_ncurses() {
     echo "Building ncurses..."
     cd "$TERMUX_TMPDIR/ncurses-snapshots-$NCURSES_SNAPSHOT_COMMIT"
     export CPPFLAGS="-fPIC"
-    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $NCURSES_CONFIGURE_ARGS
     make -j$(nproc)
     make install
@@ -128,12 +126,12 @@ termux_build_nano() {
     echo "Building nano..."
     cd "$TERMUX_TMPDIR/nano-$NANO_VERSION"
     export CFLAGS="-I$TERMUX_INCLUDE -L$TERMUX_LIB"
-    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $NANO_CONFIGURE_ARGS
     make -j$(nproc)
     make install
     rm -f "$TERMUX_BIN/rnano" "$TERMUX_ETC/man/man1/rnano.1"
     echo "include \"/system_ext/etc/nano/*nanorc\"" > "$TERMUX_ETC/nanorc"
+    echo "export TERMINFO=/system_ext/etc/terminfo" >> "$TERMUX_ETC/profile"
 }
 
 main() {
