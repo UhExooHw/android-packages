@@ -132,8 +132,12 @@ termux_build_nano() {
     rm -f "$TERMUX_BIN/rnano" "$TERMUX_ETC/man/man1/rnano.1"
     echo "include /system_ext/etc/nano/*.nanorc" > "$TERMUX_ETC/nanorc"
     echo "export TERMINFO=/system_ext/etc/terminfo" >> "$TERMUX_ETC/profile"
-    # Copy nanorc files from source
-    cp "$TERMUX_TMPDIR/nano-$NANO_VERSION/doc/syntax/"*.nanorc "$TERMUX_ETC/nano/"
+    # Copy nanorc files from installed share/nano
+    mkdir -p "$TERMUX_ETC/nano"
+    cp "$TERMUX_PREFIX/system_ext/share/nano/"*.nanorc "$TERMUX_ETC/nano/" || {
+        echo "Failed to copy *.nanorc files from $TERMUX_PREFIX/system_ext/share/nano"
+        exit 1
+    }
 }
 
 main() {
