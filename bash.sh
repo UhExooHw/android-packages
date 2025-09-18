@@ -6,12 +6,13 @@ TERMUX_HOME="/data/data/com.termux/files/home"
 TERMUX_PREFIX="${TERMUX_HOME}/system"
 TERMUX_BIN="${TERMUX_PREFIX}/bin"
 TERMUX_LIB="${TERMUX_PREFIX}/lib64"
-TERMUX_SHARE="${TERMUX_PREFIX}/usr/share"
+TERMUX_LIB32="${TERMUX_PREFIX}/lib"
+TERMUX_ETC="${TERMUX_PREFIX}/etc"
 TERMUX_INCLUDE="${TERMUX_PREFIX}/include"
 TERMUX_TMPDIR="${TERMUX_HOME}/tmp"
 TERMUX_CACHEDIR="${TERMUX_HOME}/cache"
 
-mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB" "$TERMUX_LIB/pkgconfig" "$TERMUX_SHARE" "$TERMUX_INCLUDE" "$TERMUX_SHARE/terminfo" "$TERMUX_PREFIX/etc"
+mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB" "$TERMUX_LIB32" "$TERMUX_LIB/pkgconfig" "$TERMUX_ETC" "$TERMUX_INCLUDE"
 
 termux_download() {
     local url="$1"
@@ -59,12 +60,13 @@ am_cv_langinfo_codeset=no
 --enable-pc-files
 --enable-termcap
 --enable-widec
---mandir=$TERMUX_SHARE/man
+--mandir=$TERMUX_ETC/man
 --includedir=$TERMUX_INCLUDE
 --with-pkg-config-libdir=$TERMUX_LIB/pkgconfig
 --with-static
 --with-shared
---with-termpath=$TERMUX_PREFIX/etc/termcap:$TERMUX_SHARE/misc/termcap
+--with-termpath=$TERMUX_ETC/termcap
+--with-terminfo-dirs=/system_ext/etc/terminfo
 --prefix=$TERMUX_PREFIX
 "
 
@@ -114,6 +116,7 @@ termux_build_ncurses() {
     echo "Building ncurses..."
     cd "$TERMUX_TMPDIR/ncurses-snapshots-$NCURSES_SNAPSHOT_COMMIT"
     export CPPFLAGS="-fPIC"
+    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $NCURSES_CONFIGURE_ARGS
     make -j$(nproc)
     make install
@@ -139,23 +142,6 @@ termux_build_ncurses() {
     mkdir ncurses ncursesw
     ln -sf ../{curses.h,eti.h,form.h,menu.h,ncurses_dll.h,ncurses.h,panel.h,termcap.h,term_entry.h,term.h,unctrl.h} ncurses
     ln -sf ../{curses.h,eti.h,form.h,menu.h,ncurses_dll.h,ncurses.h,panel.h,termcap.h,term_entry.h,term.h,unctrl.h} ncursesw
-
-    local TI="$TERMUX_SHARE/terminfo"
-    mkdir -p "$TI"/{a,d,e,f,g,n,k,l,p,r,s,t,v,x}
-    cp -r "$TERMUX_PREFIX"/share/terminfo/a/{alacritty{,+common,-direct},ansi} "$TI/a/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/d/{dtterm,dumb} "$TI/d/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/e/eterm-color "$TI/e/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/f/foot{,+base,-direct} "$TI/f/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/g/gnome{,-256color} "$TI/g/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/n/nsterm "$TI/n/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/k/kitty{,+common,-direct} "$TI/k/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/l/linux "$TI/l/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/p/putty{,-256color} "$TI/p/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/r/rxvt{,-256color} "$TI/r/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/s/{screen{,2,-256color},st{,-256color}} "$TI/s/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/t/tmux{,-256color} "$TI/t/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/v/vt{52,100,102} "$TI/v/" || true
-    cp -r "$TERMUX_PREFIX"/share/terminfo/x/xterm{,-color,-new,-16color,-256color,+256color} "$TI/x/" || true
 }
 
 termux_build_readline() {
@@ -167,11 +153,12 @@ termux_build_readline() {
         patch -p0 -i "$PATCHFILE"
     fi
     export CFLAGS="-fexceptions -I$TERMUX_INCLUDE -L$TERMUX_LIB"
+    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $READLINE_CONFIGURE_ARGS
     make -j$(nproc) $READLINE_MAKE_ARGS
     make install
     cp readline.pc "$TERMUX_LIB/pkgconfig/"
-    echo -e "set editing-mode vi\nset keymap vi" > "$TERMUX_PREFIX/etc/inputrc"
+    echo -e "set editing-mode vi\nset keymap vi" > "$TERMUX_ETC/inputrc"
 }
 
 termux_build_bash() {
@@ -185,12 +172,14 @@ termux_build_bash() {
         done
     fi
     export CFLAGS="-I$TERMUX_INCLUDE -L$TERMUX_LIB"
+    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $BASH_CONFIGURE_ARGS
     make -j$(nproc)
     make install
-    echo -e "export PATH=$TERMUX_PREFIX/bin:\$PATH" > "$TERMUX_PREFIX/etc/profile"
-    echo -e "if [ -f $TERMUX_PREFIX/etc/bash.bashrc ]; then\n    . $TERMUX_PREFIX/etc/bash.bashrc\nfi" >> "$TERMUX_PREFIX/etc/profile"
-    echo -e "[ -z \"\$PS1\" ] && return\nshopt -s histappend\nHISTCONTROL=ignoreboth\nHISTSIZE=1000\nHISTFILESIZE=2000\nshopt -s checkwinsize" > "$TERMUX_PREFIX/etc/bash.bashrc"
+    echo -e "export PATH=/system_ext/bin:\$PATH" > "$TERMUX_ETC/profile"
+    echo -e "export TERMINFO=/system_ext/etc/terminfo" >> "$TERMUX_ETC/profile"
+    echo -e "if [ -f $TERMUX_ETC/bash.bashrc ]; then\n    . $TERMUX_ETC/bash.bashrc\nfi" >> "$TERMUX_ETC/profile"
+    echo -e "[ -z \"\$PS1\" ] && return\nshopt -s histappend\nHISTCONTROL=ignoreboth\nHISTSIZE=1000\nHISTFILESIZE=2000\nshopt -s checkwinsize" > "$TERMUX_ETC/bash.bashrc"
 }
 
 main() {
@@ -216,8 +205,9 @@ main() {
 
     echo "- Binaries: $TERMUX_BIN"
     echo "- Libraries: $TERMUX_LIB"
+    echo "- Libraries (32-bit): $TERMUX_LIB32"
+    echo "- Configs: $TERMUX_ETC"
     echo "- Headers: $TERMUX_INCLUDE"
-    echo "- Share: $TERMUX_SHARE"
 }
 
 pkg_install_aarch64() {
