@@ -66,7 +66,6 @@ am_cv_langinfo_codeset=no
 --with-static
 --with-shared
 --with-termpath=$TERMUX_ETC/termcap
---with-terminfo-dirs=/system_ext/etc/terminfo
 --prefix=$TERMUX_PREFIX
 "
 
@@ -116,7 +115,6 @@ termux_build_ncurses() {
     echo "Building ncurses..."
     cd "$TERMUX_TMPDIR/ncurses-snapshots-$NCURSES_SNAPSHOT_COMMIT"
     export CPPFLAGS="-fPIC"
-    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $NCURSES_CONFIGURE_ARGS
     make -j$(nproc)
     make install
@@ -153,7 +151,6 @@ termux_build_readline() {
         patch -p0 -i "$PATCHFILE"
     fi
     export CFLAGS="-fexceptions -I$TERMUX_INCLUDE -L$TERMUX_LIB"
-    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $READLINE_CONFIGURE_ARGS
     make -j$(nproc) $READLINE_MAKE_ARGS
     make install
@@ -172,7 +169,6 @@ termux_build_bash() {
         done
     fi
     export CFLAGS="-I$TERMUX_INCLUDE -L$TERMUX_LIB"
-    export TERMINFO="/system_ext/etc/terminfo"
     ./configure $BASH_CONFIGURE_ARGS
     make -j$(nproc)
     make install
