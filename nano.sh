@@ -1,0 +1,183 @@
+#!/bin/bash
+
+set -e
+
+TERMUX_HOME="/data/data/com.termux/files/home"
+TERMUX_PREFIX="${TERMUX_HOME}/system"
+TERMUX_BIN="${TERMUX_PREFIX}/bin"
+TERMUX_LIB="${TERMUX_PREFIX}/lib64"
+TERMUX_SHARE="${TERMUX_PREFIX}/usr/share"
+TERMUX_INCLUDE="${TERMUX_PREFIX}/include"
+TERMUX_TMPDIR="${TERMUX_HOME}/tmp"
+TERMUX_CACHEDIR="${TERMUX_HOME}/cache"
+
+mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB/pkgconfig" "$TERMUX_SHARE" "$TERMUX_INCLUDE" "$TERMUX_SHARE/terminfo" "$TERMUX_PREFIX/etc"
+
+termux_download() {
+    local url="$1"
+    local output="$2"
+    if [ -z "$url" ]; then
+        echo "Error: Empty URL provided for download"
+        exit 1
+    fi
+    if [ ! -f "$output" ]; then
+        echo "Downloading $url..."
+        wget --tries=3 --show-progress -qO "$output" "$url" || {
+            echo "Failed to download $url"
+            exit 1
+        }
+    fi
+}
+
+termux_extract() {
+    local tarfile="$1"
+    local dirname="$2"
+    echo "Extracting $tarfile..."
+    mkdir -p "$TERMUX_TMPDIR/$dirname"
+    tar -xf "$tarfile" -C "$TERMUX_TMPDIR" || {
+        echo "Failed to extract $tarfile"
+        exit 1
+    }
+}
+
+LIBICONV_VERSION="1.18"
+LIBICONV_SRCURL="https://mirrors.kernel.org/gnu/libiconv/libiconv-$LIBICONV_VERSION.tar.gz"
+LIBICONV_CONFIGURE_ARGS="--enable-extra-encodings --prefix=$TERMUX_PREFIX --includedir=$TERMUX_INCLUDE --libdir=$TERMUX_LIB"
+
+NCURSES_SNAPSHOT_COMMIT="a480458efb0662531287f0c75116c0e91fe235cb"
+NCURSES_VERSION="6.5.20240831"
+NCURSES_SRCURL="https://github.com/ThomasDickey/ncurses-snapshots/archive/$NCURSES_SNAPSHOT_COMMIT.tar.gz"
+NCURSES_CONFIGURE_ARGS="
+ac_cv_header_locale_h=no
+am_cv_langinfo_codeset=no
+--disable-opaque-panel
+--disable-stripping
+--enable-const
+--enable-ext-colors
+--enable-ext-mouse
+--enable-overwrite
+--enable-pc-files
+--enable-termcap
+--enable-widec
+--mandir=$TERMUX_SHARE/man
+--includedir=$TERMUX_INCLUDE
+--with-pkg-config-libdir=$TERMUX_LIB/pkgconfig
+--with-static
+--with-shared
+--with-termpath=$TERMUX_PREFIX/etc/termcap:$TERMUX_SHARE/misc/termcap
+--prefix=$TERMUX_PREFIX
+"
+
+NANO_VERSION="8.6"
+NANO_SRCURL="https://nano-editor.org/dist/latest/nano-$NANO_VERSION.tar.xz"
+NANO_CONFIGURE_ARGS="
+ac_cv_header_glob_h=no
+ac_cv_header_pwd_h=no
+gl_cv_func_strcasecmp_works=yes
+--disable-libmagic
+--enable-utf8
+--with-wordbounds
+--prefix=$TERMUX_PREFIX
+--includedir=$TERMUX_INCLUDE
+--libdir=$TERMUX_LIB
+"
+
+termux_build_libiconv() {
+    echo "Building libiconv..."
+    cd "$TERMUX_TMPDIR/libiconv-$LIBICONV_VERSION"
+    ./configure $LIBICONV_CONFIGURE_ARGS
+    make -j$(nproc)
+    make install
+}
+
+termux_build_ncurses() {
+    echo "Building ncurses..."
+    cd "$TERMUX_TMPDIR/ncurses-snapshots-$NCURSES_SNAPSHOT_COMMIT"
+    export CPPFLAGS="-fPIC"
+    ./configure $NCURSES_CONFIGURE_ARGS
+    make -j$(nproc)
+    make install
+
+    cd "$TERMUX_LIB" || { echo "Failed to access $TERMUX_LIB"; exit 1; }
+    for lib in form menu ncurses panel; do
+        ln -sf "lib${lib}w.so.${NCURSES_VERSION:0:3}" "lib${lib}.so.${NCURSES_VERSION:0:3}"
+        ln -sf "lib${lib}w.so.${NCURSES_VERSION:0:3}" "lib${lib}.so.${NCURSES_VERSION:0:1}"
+        ln -sf "lib${lib}w.so.${NCURSES_VERSION:0:3}" "lib${lib}.so"
+        ln -sf "lib${lib}w.a" "lib${lib}.a"
+        ln -sf "${lib}w.pc" "pkgconfig/$lib.pc" || { echo "Failed to create symlink for $lib.pc"; exit 1; }
+    done
+    for lib in curses termcap tic tinfo; do
+        ln -sf "libncursesw.so.${NCURSES_VERSION:0:3}" "lib${lib}.so.${NCURSES_VERSION:0:3}"
+        ln -sf "libncursesw.so.${NCURSES_VERSION:0:3}" "lib${lib}.so.${NCURSES_VERSION:0:1}"
+        ln -sf "libncursesw.so.${NCURSES_VERSION:0:3}" "lib${lib}.so"
+        ln -sf "libncursesw.a" "lib${lib}.a"
+        ln -sf "ncursesw.pc" "pkgconfig/$lib.pc" || { echo "Failed to create symlink for $lib.pc"; exit 1; }
+    done
+
+    cd "$TERMUX_INCLUDE" || { echo "Failed to access $TERMUX_INCLUDE"; exit 1; }
+    rm -rf ncurses ncursesw
+    mkdir ncurses ncursesw
+    ln -sf ../{curses.h,eti.h,form.h,menu.h,ncurses_dll.h,ncurses.h,panel.h,termcap.h,term_entry.h,term.h,unctrl.h} ncurses
+    ln -sf ../{curses.h,eti.h,form.h,menu.h,ncurses_dll.h,ncurses.h,panel.h,termcap.h,term_entry.h,term.h,unctrl.h} ncursesw
+
+    local TI="$TERMUX_SHARE/terminfo"
+    mkdir -p "$TI"/{a,d,e,f,g,n,k,l,p,r,s,t,v,x}
+    cp -r "$TERMUX_PREFIX"/share/terminfo/a/{alacritty{,+common,-direct},ansi} "$TI/a/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/d/{dtterm,dumb} "$TI/d/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/e/eterm-color "$TI/e/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/f/foot{,+base,-direct} "$TI/f/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/g/gnome{,-256color} "$TI/g/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/n/nsterm "$TI/n/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/k/kitty{,+common,-direct} "$TI/k/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/l/linux "$TI/l/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/p/putty{,-256color} "$TI/p/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/r/rxvt{,-256color} "$TI/r/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/s/{screen{,2,-256color},st{,-256color}} "$TI/s/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/t/tmux{,-256color} "$TI/t/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/v/vt{52,100,102} "$TI/v/" || true
+    cp -r "$TERMUX_PREFIX"/share/terminfo/x/xterm{,-color,-new,-16color,-256color,+256color} "$TI/x/" || true
+}
+
+termux_build_nano() {
+    echo "Building nano..."
+    cd "$TERMUX_TMPDIR/nano-$NANO_VERSION"
+    export CFLAGS="-I$TERMUX_INCLUDE -L$TERMUX_LIB"
+    ./configure $NANO_CONFIGURE_ARGS
+    make -j$(nproc)
+    make install
+    rm -f "$TERMUX_BIN/rnano" "$TERMUX_SHARE/man/man1/rnano.1"
+    echo "include \"$TERMUX_PREFIX/share/nano/*nanorc\"" > "$TERMUX_PREFIX/etc/nanorc"
+}
+
+main() {
+    echo "Installing build dependencies..."
+    pkg_install="pkg_install_$(uname -m)"
+    $pkg_install build-essential wget tar patch xz-utils
+
+    echo "Downloading sources..."
+    termux_download "$LIBICONV_SRCURL" "$TERMUX_CACHEDIR/libiconv-$LIBICONV_VERSION.tar.gz"
+    termux_download "$NCURSES_SRCURL" "$TERMUX_CACHEDIR/ncurses-snapshots-$NCURSES_SNAPSHOT_COMMIT.tar.gz"
+    termux_download "$NANO_SRCURL" "$TERMUX_CACHEDIR/nano-$NANO_VERSION.tar.xz"
+
+    termux_extract "$TERMUX_CACHEDIR/libiconv-$LIBICONV_VERSION.tar.gz" "libiconv-$LIBICONV_VERSION"
+    termux_extract "$TERMUX_CACHEDIR/ncurses-snapshots-$NCURSES_SNAPSHOT_COMMIT.tar.gz" "ncurses-snapshots-$NCURSES_SNAPSHOT_COMMIT"
+    tar -xf "$TERMUX_CACHEDIR/nano-$NANO_VERSION.tar.xz" -C "$TERMUX_TMPDIR"
+
+    termux_build_libiconv
+    termux_build_ncurses
+    termux_build_nano
+
+    echo "- Binaries: $TERMUX_BIN"
+    echo "- Libraries: $TERMUX_LIB"
+    echo "- Headers: $TERMUX_INCLUDE"
+    echo "- Share: $TERMUX_SHARE"
+}
+
+pkg_install_aarch64() {
+    pkg_install_arm64
+}
+pkg_install_arm64() {
+    pkg update -y && pkg install -y build-essential wget tar patch xz-utils binutils 
+}
+
+main
