@@ -39,12 +39,37 @@ termux_extract() {
     }
 }
 
+termux_patch_byteswap() {
+    cd "$TERMUX_TMPDIR/busybox-$BUSYBOX_VERSION"
+    cat << 'EOF' > "$TERMUX_CACHEDIR/0017-byteswap-fix.patch"
+--- a/include/platform.h
++++ b/include/platform.h
+@@ -165,7 +165,14 @@
+ #include <endian.h>
+ #include <byteswap.h>
+ #else
+-# include <byteswap.h>
++#if __has_include(<byteswap.h>)
++# include <byteswap.h>
++#else
++# define bswap_16(x) __builtin_bswap16(x)
++# define bswap_32(x) __builtin_bswap32(x)
++# define bswap_64(x) __builtin_bswap64(x)
++#endif
+ #endif
+ #if __BYTE_ORDER == __LITTLE_ENDIAN
+ # define BB_LITTLE_ENDIAN 1
+EOF
+    patch -p1 < "$TERMUX_CACHEDIR/0017-byteswap-fix.patch" || { echo "Failed to apply byteswap patch"; exit 1; }
+}
+
 BUSYBOX_VERSION="1.37.0"
 BUSYBOX_SRCURL="https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2"
 BUSYBOX_SHA256="3311dff32e746499f4df0d5df04d7eb396382d7e108bb9250e7b519b837043a4"
 
 termux_build_busybox() {
     cd "$TERMUX_TMPDIR/busybox-$BUSYBOX_VERSION"
+    termux_patch_byteswap
     for patch in "$TERMUX_CACHEDIR"/00*.patch; do
         patch -p1 < "$patch" || { echo "Failed to apply $patch"; exit 1; }
     done
