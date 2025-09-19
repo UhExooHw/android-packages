@@ -65,7 +65,17 @@ BUSYBOX_CONFIG_URL="https://raw.githubusercontent.com/termux/termux-packages/ref
 termux_build_busybox() {
     echo "Building busybox..."
     cd "$TERMUX_TMPDIR/busybox-$BUSYBOX_VERSION"
-
+    sed -i '168i\
+#ifndef __has_include\n\
+#define __has_include(x) 0\n\
+#endif\n\
+#if __has_include(<byteswap.h>)\n\
+# include <byteswap.h>\n\
+#else\n\
+# define bswap_16(x) __builtin_bswap16(x)\n\
+# define bswap_32(x) __builtin_bswap32(x)\n\
+# define bswap_64(x) __builtin_bswap64(x)\n\
+#endif' include/platform.h
     for patch_url in "${BUSYBOX_PATCHES[@]}"; do
         patch_name=$(basename "$patch_url")
         termux_download "$patch_url" "$TERMUX_CACHEDIR/$patch_name"
@@ -75,17 +85,16 @@ termux_build_busybox() {
             exit 1
         }
     done
-
     termux_download "$BUSYBOX_CONFIG_URL" "$TERMUX_CACHEDIR/busybox.config"
     sed -e "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" \
-        -e "s|@TERMUX_SYSROOT@|$TERMUX_STANDALONE_TOOLCHAIN/sysroot|g" \
+        -e "s|@TERMUX_SYSROOT@|$TERMUX_HOME/usr|g" \
         -e "s|@TERMUX_HOST_PLATFORM@|${TERMUX_HOST_PLATFORM:-aarch64-linux-android}|g" \
-        -e "s|@TERMUX_CFLAGS@|-Wno-ignored-optimization-argument -Wno-unused-command-line-argument|g" \
+        -e "s|@TERMUX_CFLAGS@|-Wno-ignored-optimization-argument -Wno-unused-command-line-argument -I$TERMUX_HOME/usr/include|g" \
         -e "s|@TERMUX_LDFLAGS@||g" \
         -e "s|@TERMUX_LDLIBS@|log|g" \
         "$TERMUX_CACHEDIR/busybox.config" > .config
     make oldconfig
-
+    export CFLAGS="-I$TERMUX_INCLUDE -I$TERMUX_HOME/usr/include"
     make -j$(nproc)
     install -Dm700 "./0_lib/busybox_unstripped" "$TERMUX_BIN/busybox"
     install -Dm700 "./0_lib/libbusybox.so.${BUSYBOX_VERSION}_unstripped" "$TERMUX_LIB/libbusybox.so.${BUSYBOX_VERSION}"
@@ -93,7 +102,6 @@ termux_build_busybox() {
     install -Dm600 -t "$TERMUX_ETC/man/man1" "docs/busybox.1"
     ln -sf "$TERMUX_BIN/busybox" "$TERMUX_BIN/ash"
     ln -sf "$TERMUX_ETC/man/man1/busybox.1" "$TERMUX_ETC/man/man1/ash.1"
-
     mkdir -p "$TERMUX_LIBexec/busybox"
     for applet in 'less' 'nc' 'vi'; do
         cat > "$TERMUX_LIBexec/busybox/$applet" <<EOF
@@ -107,14 +115,11 @@ EOF
 main() {
     echo "Installing build dependencies..."
     pkg_install="pkg_install_$(uname -m)"
-    $pkg_install build-essential wget tar patch bzip2
-
+    $pkg_install build-essential wget tar patch bzip2 binutils
     echo "Downloading sources..."
     termux_download "$BUSYBOX_SRCURL" "$TERMUX_CACHEDIR/busybox-$BUSYBOX_VERSION.tar.bz2"
     termux_extract "$TERMUX_CACHEDIR/busybox-$BUSYBOX_VERSION.tar.bz2" "busybox-$BUSYBOX_VERSION"
-
     termux_build_busybox
-
     echo "- Binaries: $TERMUX_BIN"
     echo "- Libraries: $TERMUX_LIB"
     echo "- Libraries (32-bit): $TERMUX_LIB32"
