@@ -11,15 +11,12 @@ TERMUX_INCLUDE="${TERMUX_PREFIX}/include"
 TERMUX_TMPDIR="${TERMUX_HOME}/tmp"
 TERMUX_CACHEDIR="${TERMUX_HOME}/cache"
 
-mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB" "$TERMUX_LIB32" "$TERMUX_LIB/pkgconfig" "$TERMUX_ETC" "$TERMUX_INCLUDE"
+mkdir -p "$TERMUX_TMPDIR" "$TERMUX_CACHEDIR" "$TERMUX_BIN" "$TERMUX_LIB" "$TERMUX_LIB32" \
+         "$TERMUX_LIB/pkgconfig" "$TERMUX_ETC" "$TERMUX_INCLUDE"
 
 termux_download() {
     local url="$1"
     local output="$2"
-    if [ -z "$url" ]; then
-        echo "Error: Empty URL provided for download"
-        exit 1
-    fi
     if [ ! -f "$output" ]; then
         echo "Downloading $url..."
         wget --tries=3 --show-progress -qO "$output" "$url" || {
@@ -31,9 +28,7 @@ termux_download() {
 
 termux_extract() {
     local tarfile="$1"
-    local dirname="$2"
     echo "Extracting $tarfile..."
-    mkdir -p "$TERMUX_TMPDIR/$dirname"
     tar -xf "$tarfile" -C "$TERMUX_TMPDIR" || {
         echo "Failed to extract $tarfile"
         exit 1
@@ -41,42 +36,46 @@ termux_extract() {
 }
 
 BUSYBOX_VERSION="1.37.0"
+BUSYBOX_REVISION="2"
 BUSYBOX_SRCURL="https://busybox.net/downloads/busybox-${BUSYBOX_VERSION}.tar.bz2"
-BUSYBOX_CONFIG_URL="https://raw.githubusercontent.com/termux/termux-packages/refs/heads/master/packages/busybox/busybox.config"
-BUSYBOX_CONFIGURE_ARGS="
---prefix=/system_ext
---includedir=/system_ext/include
---libdir=/system_ext/lib64
-"
+BUSYBOX_SHA256="f0a5ab1d60796f8aeecc4430ebdc80bd048393ca5c7d07212e72602197f98453"
 
 termux_build_busybox() {
-    cd "$TERMUX_TMPDIR/busybox-$BUSYBOX_VERSION" || exit 1
-    termux_download "$BUSYBOX_CONFIG_URL" "$TERMUX_TMPDIR/busybox-$BUSYBOX_VERSION/busybox.config"
-    export CFLAGS="-Wno-ignored-optimization-argument -Wno-unused-command-line-argument"
-    sed -e "s|@TERMUX_PREFIX@|/system_ext|g" \
-        -e "s|@TERMUX_CFLAGS@|$CFLAGS|g" \
-        -e "s|@TERMUX_LDFLAGS@|$LDFLAGS|g" \
-        -e "s|@TERMUX_LDLIBS@|log|g" \
-        -e "s|@TERMUX_HOST_PLATFORM@-||g" \
-        -e "s|@TERMUX_SYSROOT@||g" \
-        "busybox.config" > .config
-    unset CFLAGS LDFLAGS
-    make oldconfig
-    make -j$(nproc)
-    install -Dm700 "./busybox" "$TERMUX_PREFIX/bin/busybox"
-    install -Dm700 "./libbusybox.so.${BUSYBOX_VERSION}" "$TERMUX_PREFIX/lib/libbusybox.so.${BUSYBOX_VERSION}"
-    ln -sfr "$TERMUX_PREFIX/lib/libbusybox.so.${BUSYBOX_VERSION}" "$TERMUX_PREFIX/lib/libbusybox.so"
+    echo "Building busybox..."
+    cd "$TERMUX_TMPDIR/busybox-${BUSYBOX_VERSION}"
+
+    make distclean || true
+
+    make defconfig
+
+    sed -i \
+        -e 's/.*CONFIG_STATIC.*/# CONFIG_STATIC is not set/' \
+        -e 's/.*CONFIG_FEATURE_INSTALLER.*/CONFIG_FEATURE_INSTALLER=y/' \
+        .config
+
+    make -j"$(nproc)"
+
+    make CONFIG_PREFIX="$TERMUX_PREFIX/system_ext" install
+
+    rm -f "$TERMUX_PREFIX/system_ext/bin/rnano" 2>/dev/null || true
+
+    echo "BusyBox build finished."
 }
 
 main() {
+    echo "Installing build dependencies..."
     pkg_install="pkg_install_$(uname -m)"
-    $pkg_install build-essential wget tar patch xz-utils bzip2
-    termux_download "$BUSYBOX_SRCURL" "$TERMUX_CACHEDIR/busybox-$BUSYBOX_VERSION.tar.bz2"
-    termux_extract "$TERMUX_CACHEDIR/busybox-$BUSYBOX_VERSION.tar.bz2" "busybox-$BUSYBOX_VERSION"
+    $pkg_install build-essential wget tar bzip2
+
+    echo "Downloading sources..."
+    termux_download "$BUSYBOX_SRCURL" "$TERMUX_CACHEDIR/busybox-${BUSYBOX_VERSION}.tar.bz2"
+
+    termux_extract "$TERMUX_CACHEDIR/busybox-${BUSYBOX_VERSION}.tar.bz2"
+
     termux_build_busybox
+
     echo "- Binaries: $TERMUX_BIN"
     echo "- Libraries: $TERMUX_LIB"
-    echo "- Libraries (32-bit): $TERMUX_LIB32"
     echo "- Configs: $TERMUX_ETC"
     echo "- Headers: $TERMUX_INCLUDE"
 }
@@ -84,9 +83,8 @@ main() {
 pkg_install_aarch64() {
     pkg_install_arm64
 }
-
 pkg_install_arm64() {
-    pkg update -y && pkg install -y build-essential wget tar patch xz-utils bzip2 binutils
+    pkg update -y && pkg install -y build-essential wget tar bzip2 xz-utils binutils
 }
 
 main
