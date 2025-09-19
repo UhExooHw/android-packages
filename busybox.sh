@@ -41,25 +41,7 @@ termux_extract() {
 
 termux_patch_byteswap() {
     cd "$TERMUX_TMPDIR/busybox-$BUSYBOX_VERSION"
-    cat << 'EOF' > "$TERMUX_CACHEDIR/0017-byteswap-fix.patch"
---- a/include/platform.h
-+++ b/include/platform.h
-@@ -165,7 +165,14 @@
- #include <endian.h>
- #include <byteswap.h>
- #else
--# include <byteswap.h>
-+#if __has_include(<byteswap.h>)
-+# include <byteswap.h>
-+#else
-+# define bswap_16(x) __builtin_bswap16(x)
-+# define bswap_32(x) __builtin_bswap32(x)
-+# define bswap_64(x) __builtin_bswap64(x)
-+#endif
- #endif
- #if __BYTE_ORDER == __LITTLE_ENDIAN
- # define BB_LITTLE_ENDIAN 1
-EOF
+    echo -e "--- a/include/platform.h\n+++ b/include/platform.h\n@@ -165,7 +165,14 @@\n #include <endian.h>\n #include <byteswap.h>\n #else\n-# include <byteswap.h>\n+#if __has_include(<byteswap.h>)\n+# include <byteswap.h>\n+#else\n+# define bswap_16(x) __builtin_bswap16(x)\n+# define bswap_32(x) __builtin_bswap32(x)\n+# define bswap_64(x) __builtin_bswap64(x)\n+#endif\n #endif\n #if __BYTE_ORDER == __LITTLE_ENDIAN\n # define BB_LITTLE_ENDIAN 1" > "$TERMUX_CACHEDIR/0017-byteswap-fix.patch"
     patch -p1 < "$TERMUX_CACHEDIR/0017-byteswap-fix.patch" || { echo "Failed to apply byteswap patch"; exit 1; }
 }
 
@@ -127,7 +109,7 @@ main() {
     echo "- Binaries: $TERMUX_BIN"
     echo "- Libraries: $TERMUX_LIB"
     echo "- Libraries (32-bit): $TERMUX_LIB32"
-    echo "- Configs: $TERMUX_ETC"
+    echo "- Configs: $TERMUX_E TC"
     echo "- Headers: $TERMUX_INCLUDE"
     echo "Built files in $TERMUX_PREFIX/system_ext"
 }
