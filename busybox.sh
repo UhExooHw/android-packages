@@ -66,6 +66,7 @@ termux_build_busybox() {
     echo "Building busybox..."
     cd "$TERMUX_TMPDIR/busybox-$BUSYBOX_VERSION"
 
+    # Apply patches
     for patch in "$TERMUX_CACHEDIR"/*.patch; do
         echo "Applying $patch..."
         patch -p1 < "$patch" || {
@@ -74,7 +75,8 @@ termux_build_busybox() {
         }
     done
 
-    export CFLAGS="-I$TERMUX_INCLUDE -D_GNU_SOURCE -Wno-ignored-optimization-argument -Wno-unused-command-line-argument"
+    # Avoid byteswap.h by defining macros
+    export CFLAGS="-I$TERMUX_INCLUDE -D_GNU_SOURCE -D__GLIBC__ -Wno-ignored-optimization-argument -Wno-unused-command-line-argument"
     export LDFLAGS="-L$TERMUX_LIB"
 
     sed -e "s|@TERMUX_PREFIX@|$TERMUX_PREFIX|g" \
